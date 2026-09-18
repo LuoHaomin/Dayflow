@@ -13,6 +13,9 @@ extension OllamaProvider {
     var max_tokens: Int = 4000
     var stream: Bool = false
     var reasoning: Reasoning? = nil
+    // MiniMax M3 emits <think> content by default and reasoning tokens count
+    // against max_tokens; set to "disabled" for timeline JSON calls.
+    var thinking: String? = nil
 
     struct Reasoning: Codable {
       let effort: String

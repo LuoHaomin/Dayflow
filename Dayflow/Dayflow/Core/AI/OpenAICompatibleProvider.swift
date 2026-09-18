@@ -34,6 +34,14 @@ final class OpenAICompatibleProvider: ChatGPTTimelinePromptSupporting {
     if URL(string: configuration.endpoint)?.host?.lowercased() == "openrouter.ai" {
       request.reasoning = .init(effort: "low")
     }
+    // MiniMax M3 thinks by default and burns max_tokens on <think> blocks;
+    // timeline calls only need the final JSON.
+    let host = URL(string: configuration.endpoint)?.host?.lowercased() ?? ""
+    if host.hasSuffix("minimax.cn") || host.hasSuffix("minimax.io") {
+      if configuration.modelID.uppercased().contains("M3") {
+        request.thinking = "disabled"
+      }
+    }
     return request
   }
 
