@@ -100,6 +100,95 @@ final class OpenAICompatibleProvider: ChatGPTTimelinePromptSupporting {
       .trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
+  /// Models occasionally emit unescaped double quotes inside string values
+  /// (e.g. 'titled "替代论证"'). When strict parsing fails, escape any quote
+  /// that isn't followed by a structural character (`,` `:` `}` `]` or end).
+  private func escapingEmbeddedQuotes(_ json: String) -> String {
+    var out = ""
+    out.reserveCapacity(json.count)
+    var inString = false
+    var escaped = false
+    let chars = Array(json)
+    for (i, c) in chars.enumerated() {
+      if escaped {
+        out.append(c)
+        escaped = false
+        continue
+      }
+      if c == "\\" && inString {
+        out.append(c)
+        escaped = true
+        continue
+      }
+      if c == "\"" {
+        if !inString {
+          inString = true
+          out.append(c)
+          continue
+        }
+        // Closing quote only if the next non-space char is structural or end.
+        var j = i + 1
+        while j < chars.count, chars[j] == " " || chars[j] == "\n" || chars[j] == "\t" { j += 1 }
+        let structural =
+          j >= chars.count || ",:}]".contains(chars[j])
+        if structural {
+          inString = false
+          out.append(c)
+        } else {
+          out.append("\\\"")
+        }
+        continue
+      }
+      out.append(c)
+    }
+    return out
+  }
+
+  private func decodeCards(_ output: String) throws -> [ActivityCardData] {
+    let cleaned = cleanJSON(output)
+    let data = Data(cleaned.utf8)
+    if let decoded = try? self.transport.parseJSONResponse([ActivityCardData].self, from: data) {
+      return decoded
+    }
+    let repaired = escapingEmbeddedQuotes(cleaned)
+    return try self.transport.parseJSONResponse(
+      [ActivityCardData].self, from: Data(repaired.utf8))
+  }
+
+  private func cardDurationMinutes(_ card: ActivityCardData) -> Double {
+    if card.startTime.contains("AM") || card.startTime.contains("PM") {
+      let formatter = DateFormatter()
+      formatter.dateFormat = "h:mm a"
+      formatter.locale = Locale(identifier: "en_US_POSIX")
+      guard let start = formatter.date(from: card.startTime),
+        let end = formatter.date(from: card.endTime)
+      else { return 0 }
+      var adjusted = end
+      if end < start { adjusted = Calendar.current.date(byAdding: .day, value: 1, to: end) ?? end }
+      return adjusted.timeIntervalSince(start) / 60.0
+    }
+    return Double(parseVideoTimestamp(card.endTime) - parseVideoTimestamp(card.startTime)) / 60.0
+  }
+
+  /// Merge cards shorter than the 10-minute minimum into their successor so a
+  /// single short card doesn't fail the whole batch at validation.
+  private func mergingShortCards(_ cards: [ActivityCardData]) -> [ActivityCardData] {
+    var result = cards
+    var i = 0
+    while i < result.count - 1 {
+      guard cardDurationMinutes(result[i]) < 10 else { i += 1; continue }
+      let short = result.remove(at: i)
+      let next = result[i]
+      result[i] = ActivityCardData(
+        startTime: short.startTime, endTime: next.endTime,
+        category: next.category, subcategory: next.subcategory, title: next.title,
+        summary: next.summary,
+        detailedSummary: short.detailedSummary + "\n" + next.detailedSummary,
+        distractions: next.distractions, appSites: next.appSites)
+    }
+    return result
+  }
+
   private func invalidOutput(_ message: String) -> NSError {
     NSError(
       domain: "OpenAICompatibleProvider", code: 1,
@@ -170,9 +259,9 @@ final class OpenAICompatibleProvider: ChatGPTTimelinePromptSupporting {
     let prompt = buildCardsPrompt(observations: observations, context: context)
     return try await generate(prompt: prompt, operation: "generate_cards", batchId: batchId) {
       output in
-      let decoded = try self.transport.parseJSONResponse(
-        [ActivityCardData].self, from: Data(self.cleanJSON(output).utf8))
+      var decoded = try self.decodeCards(output)
       guard !decoded.isEmpty else { throw self.invalidOutput("No cards returned.") }
+      decoded = self.mergingShortCards(decoded)
       let cards = self.normalizeCards(decoded, descriptors: context.categories)
       let coverage = self.validateTimeCoverage(
         existingCards: context.existingCards, newCards: cards)
