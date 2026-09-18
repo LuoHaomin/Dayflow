@@ -145,7 +145,7 @@ extension StorageManager {
           Dayflow couldn't open its database and has to quit. This usually happens \
           when the disk is full — free up some space and open Dayflow again.
 
-          Error: \(error)
+          Error: \(String(describing: error))
           """)
       alert.addButton(withTitle: String(localized: "Quit"))
       alert.runModal()
