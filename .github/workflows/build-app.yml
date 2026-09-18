@@ -1,0 +1,41 @@
+name: Build Dayflow (patched)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [patched-timeouts]
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build app (ad-hoc signed)
+        run: |
+          xcodebuild \
+            -project Dayflow/Dayflow.xcodeproj \
+            -scheme Dayflow \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM="" \
+            clean build
+
+      - name: Package app
+        run: |
+          APP="$(find ~/Library/Developer/Xcode/DerivedData -type d -name 'Dayflow.app' -path '*Release*' | head -1)"
+          echo "APP=$APP"
+          mkdir -p artifact
+          cp -R "$APP" artifact/
+          cd artifact && zip -qry Dayflow-patched.zip Dayflow.app
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Dayflow-patched
+          path: artifact/Dayflow-patched.zip

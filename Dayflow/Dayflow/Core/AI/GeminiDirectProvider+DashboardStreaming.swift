@@ -17,7 +17,7 @@ extension GeminiDirectProvider {
       url: URL(string: dashboardStreamEndpoint(model: model) + "?alt=sse&key=\(apiKey)")!)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    request.timeoutInterval = 180
+    request.timeoutInterval = 600
     request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
 
     let (bytes, response) = try await URLSession.shared.bytes(for: request)
@@ -108,7 +108,7 @@ extension GeminiDirectProvider {
       url: URL(string: dashboardGenerateEndpoint(model: model) + "?key=\(apiKey)")!)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    request.timeoutInterval = 180
+    request.timeoutInterval = 600
     request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
 
     let (data, response) = try await URLSession.shared.data(for: request)

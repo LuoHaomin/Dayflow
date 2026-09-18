@@ -49,7 +49,7 @@ extension OllamaProvider {
   func makeChatURLRequest(
     _ request: ChatRequest,
     url: URL? = nil,
-    timeoutInterval: TimeInterval = 60.0
+    timeoutInterval: TimeInterval = 600.0
   ) throws -> URLRequest {
     guard let resolvedURL = url ?? LocalEndpointUtilities.chatCompletionsURL(baseURL: endpoint)
     else {

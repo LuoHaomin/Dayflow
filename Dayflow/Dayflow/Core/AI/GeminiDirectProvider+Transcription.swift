@@ -300,7 +300,7 @@ extension GeminiDirectProvider {
     var request = URLRequest(url: URL(string: urlWithKey)!)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    request.timeoutInterval = 120  // 2 minutes timeout
+    request.timeoutInterval = 600
     let requestStart = Date()
 
     do {
