@@ -39,7 +39,7 @@ final class OpenAICompatibleProvider: ChatGPTTimelinePromptSupporting {
     let host = URL(string: configuration.endpoint)?.host?.lowercased() ?? ""
     if host.hasSuffix("minimax.cn") || host.hasSuffix("minimax.io") {
       if configuration.modelID.uppercased().contains("M3") {
-        request.thinking = "disabled"
+        request.thinking = .init(type: "disabled")
       }
     }
     return request

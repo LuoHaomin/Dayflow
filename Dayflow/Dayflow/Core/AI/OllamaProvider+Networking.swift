@@ -14,8 +14,12 @@ extension OllamaProvider {
     var stream: Bool = false
     var reasoning: Reasoning? = nil
     // MiniMax M3 emits <think> content by default and reasoning tokens count
-    // against max_tokens; set to "disabled" for timeline JSON calls.
-    var thinking: String? = nil
+    // against max_tokens; {"type":"disabled"} turns it off for timeline calls.
+    var thinking: Thinking? = nil
+
+    struct Thinking: Codable {
+      let type: String
+    }
 
     struct Reasoning: Codable {
       let effort: String
