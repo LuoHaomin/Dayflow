@@ -28,7 +28,7 @@ final class OpenAICompatibleProvider: ChatGPTTimelinePromptSupporting {
           ]),
         .init(role: "user", content: content),
       ],
-      max_tokens: 8000
+      max_tokens: 16000
     )
     // Other compatible endpoints may not accept OpenRouter's reasoning object.
     if URL(string: configuration.endpoint)?.host?.lowercased() == "openrouter.ai" {
@@ -81,7 +81,13 @@ final class OpenAICompatibleProvider: ChatGPTTimelinePromptSupporting {
   }
 
   private func cleanJSON(_ output: String) -> String {
-    output.replacingOccurrences(of: "```json", with: "")
+    // Reasoning models (e.g. MiniMax-M3, DeepSeek-R1) prepend a <think> block;
+    // strip it before looking for JSON, alongside markdown fences.
+    var cleaned = output
+    if let range = cleaned.range(of: "</think>") {
+      cleaned = String(cleaned[range.upperBound...])
+    }
+    return cleaned.replacingOccurrences(of: "```json", with: "")
       .replacingOccurrences(of: "```", with: "")
       .trimmingCharacters(in: .whitespacesAndNewlines)
   }
