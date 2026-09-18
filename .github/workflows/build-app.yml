@@ -27,6 +27,14 @@ jobs:
             DEVELOPMENT_TEAM="" \
             clean build
 
+      - name: Re-sign with real ad-hoc signature
+        run: |
+          # Xcode's linker-signed output fails `codesign -v` and macOS TCC
+          # (ScreenCapture permission) won't stick to it. Re-sign properly.
+          APP="$(find ~/Library/Developer/Xcode/DerivedData -type d -name 'Dayflow.app' -path '*Release*' | head -1)"
+          codesign --force --deep --sign - "$APP"
+          codesign -v "$APP"
+
       - name: Package app
         run: |
           APP="$(find ~/Library/Developer/Xcode/DerivedData -type d -name 'Dayflow.app' -path '*Release*' | head -1)"
