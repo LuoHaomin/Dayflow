@@ -224,6 +224,9 @@ final class AnalyticsService {
 
   var isOptedIn: Bool {
     get {
+      if PersonalBuildConfig.disableTelemetry {
+        return false
+      }
       if UserDefaults.standard.object(forKey: optInKey) == nil {
         // Default ON per product decision
         return true

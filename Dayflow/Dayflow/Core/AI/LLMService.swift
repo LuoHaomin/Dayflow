@@ -171,6 +171,14 @@ final class LLMService: LLMServicing {
   }
 
   private func makeOpenAICompatibleProvider() -> OpenAICompatibleProvider? {
+    if let profile = ProviderProfileStore.selectedProfile() {
+      let runtimeConfiguration = OpenAICompatibleRuntimeConfiguration(
+        configuration: profile.configuration,
+        bearerToken: ProviderProfileStore.apiKey(for: profile),
+        analyticsProvider: ProviderProfileStore.keychainID(for: profile.id),
+        thinkingMode: profile.thinkingMode)
+      return OpenAICompatibleProvider(configuration: runtimeConfiguration)
+    }
     guard let configuration = OpenAICompatiblePreferences.load(), configuration.isComplete else {
       print("❌ [LLMService] OpenAI-compatible provider unavailable: incomplete configuration")
       return nil

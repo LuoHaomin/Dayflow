@@ -39,10 +39,25 @@ struct SettingsProvidersTabView: View {
         geminiModelSection
       }
 
+      providerProfilesSection
+
       primaryPromptCustomizationSection
       if viewModel.hasCodexOrClaudeProviderInRouting {
         agentPromptCustomizationSection
       }
+    }
+  }
+
+  // MARK: - Provider profiles (personal build)
+
+  private var providerProfilesSection: some View {
+    SettingsSection(
+      title: String(localized: "Custom API profiles"),
+      subtitle: String(
+        localized:
+          "OpenAI-compatible endpoints used by the timeline, chat, and Daily. The selected profile takes priority over the single-endpoint config above.")
+    ) {
+      ProviderProfilesEditor()
     }
   }
 
@@ -912,5 +927,189 @@ struct LocalModelUpgradeSheet: View {
             .stroke(Color.black.opacity(0.1), lineWidth: 1)
         )
     )
+  }
+}
+
+
+// MARK: - Provider profiles editor (personal build)
+
+/// Self-contained editor for the multi-provider profile list. The pipeline
+/// (LLMService) prefers the selected profile over the legacy single config.
+private struct ProviderProfilesEditor: View {
+  @State private var profiles: [ProviderProfile] = []
+  @State private var selectedID: UUID?
+  @State private var editing: ProviderProfile?
+  @State private var isAddingNew = false
+  @State private var apiKeyInput: String = ""
+  @State private var keyStatus: String = ""
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      if profiles.isEmpty {
+        Text("No profiles. Add one from a template or blank.")
+          .font(.custom("Figtree", size: 12))
+          .foregroundColor(SettingsStyle.secondary)
+      }
+      ForEach(profiles) { profile in
+        HStack(spacing: 10) {
+          Image(
+            systemName: profile.id == selectedID ? "checkmark.circle.fill" : "circle"
+          )
+          .foregroundColor(profile.id == selectedID ? SettingsStyle.statusGood : .gray)
+          VStack(alignment: .leading, spacing: 2) {
+            Text(profile.name)
+              .font(.custom("Figtree", size: 13))
+              .fontWeight(.semibold)
+            Text("\(profile.modelID.isEmpty ? "no model set" : profile.modelID) · \(profile.baseURL)")
+              .font(.custom("Figtree", size: 11))
+              .foregroundColor(SettingsStyle.secondary)
+          }
+          Spacer()
+          Button("Use") {
+            ProviderProfileStore.select(profile.id)
+            reload()
+          }
+          .disabled(profile.id == selectedID || !profile.isComplete)
+          Button("Edit") {
+            apiKeyInput = ""
+            keyStatus =
+              (ProviderProfileStore.apiKey(for: profile) ?? "").isEmpty
+              ? "No API key set" : "API key stored"
+            editing = profile
+          }
+          Button("Delete") {
+            _ = ProviderProfileStore.delete(profile.id)
+            reload()
+          }
+        }
+        .buttonStyle(.link)
+        .font(.custom("Figtree", size: 12))
+      }
+
+      HStack(spacing: 8) {
+        Menu("Add from template") {
+          ForEach(Array(ProviderProfile.templates.enumerated()), id: \.offset) { _, template in
+            Button(template.name) {
+              apiKeyInput = ""
+              keyStatus = "No API key set"
+              editing = template
+            }
+          }
+          Divider()
+          Button("Blank") {
+            apiKeyInput = ""
+            keyStatus = "No API key set"
+            editing = ProviderProfile(name: "", baseURL: "", modelID: "")
+          }
+        }
+        .fixedSize()
+      }
+    }
+    .sheet(isPresented: Binding(
+      get: { editing != nil },
+      set: { if !$0 { editing = nil } }
+    )) {
+      if let profile = editing {
+        ProviderProfileEditSheet(
+          profile: profile,
+          apiKeyInput: $apiKeyInput,
+          keyStatus: keyStatus
+        ) { updated, apiKey in
+          _ = ProviderProfileStore.upsert(updated)
+          if !apiKey.isEmpty {
+            _ = KeychainManager.shared.store(
+              apiKey, for: ProviderProfileStore.keychainID(for: updated.id))
+          }
+          if updated.isComplete { ProviderProfileStore.select(updated.id) }
+          reload()
+          editing = nil
+        }
+      }
+    }
+    .onAppear { reload() }
+  }
+
+  private func reload() {
+    profiles = ProviderProfileStore.load()
+    selectedID = ProviderProfileStore.selectedID()
+  }
+}
+
+private struct ProviderProfileEditSheet: View {
+  let profile: ProviderProfile
+  @Binding var apiKeyInput: String
+  let keyStatus: String
+  let onSave: (ProviderProfile, String) -> Void
+
+  @Environment(\.dismiss) private var dismiss
+  @State private var name: String = ""
+  @State private var baseURL: String = ""
+  @State private var modelID: String = ""
+  @State private var thinkingMode = "auto"
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      Text(profile.name.isEmpty ? "New provider profile" : "Edit \(profile.name)")
+        .font(.custom("Figtree", size: 15))
+        .fontWeight(.bold)
+
+      labeledField("Name", $name)
+      labeledField("Base URL (e.g. https://api.minimax.cn/v1)", $baseURL)
+      labeledField("Model ID (e.g. MiniMax-M3)", $modelID)
+
+      HStack {
+        Text("Thinking (MiniMax)")
+          .font(.custom("Figtree", size: 12))
+        Picker("", selection: $thinkingMode) {
+          Text("Auto").tag("auto")
+          Text("Disabled").tag("disabled")
+          Text("Adaptive").tag("adaptive")
+        }
+        .pickerStyle(.menu)
+        .frame(width: 160)
+      }
+
+      VStack(alignment: .leading, spacing: 4) {
+        SecureField(
+          keyStatus.isEmpty ? "API key" : "API key (\(keyStatus))",
+          text: $apiKeyInput
+        )
+        .textFieldStyle(.roundedBorder)
+        Text("Leave blank to keep the stored key.")
+          .font(.custom("Figtree", size: 10))
+          .foregroundColor(SettingsStyle.secondary)
+      }
+
+      HStack {
+        Button("Cancel") { dismiss() }
+        Button("Save") {
+          onSave(
+            ProviderProfile(
+              id: profile.id, name: name, baseURL: baseURL, modelID: modelID,
+              thinkingMode: thinkingMode),
+            apiKeyInput
+          )
+        }
+        .disabled(
+          name.trimmingCharacters(in: .whitespaces).isEmpty || baseURL.isEmpty || modelID.isEmpty)
+      }
+    }
+    .padding(20)
+    .frame(width: 460)
+    .onAppear {
+      name = profile.name
+      baseURL = profile.baseURL
+      modelID = profile.modelID
+      thinkingMode = profile.thinkingMode
+    }
+  }
+
+  private func labeledField(_ label: String, _ value: Binding<String>) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text(label).font(.custom("Figtree", size: 12))
+      TextField("", text: value)
+        .textFieldStyle(.roundedBorder)
+        .disableAutocorrection(true)
+    }
   }
 }

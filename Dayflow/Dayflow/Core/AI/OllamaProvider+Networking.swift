@@ -56,7 +56,7 @@ extension OllamaProvider {
   func makeChatURLRequest(
     _ request: ChatRequest,
     url: URL? = nil,
-    timeoutInterval: TimeInterval = 600.0
+    timeoutInterval: TimeInterval = LLMAdvancedPreferences.requestTimeout
   ) throws -> URLRequest {
     guard let resolvedURL = url ?? LocalEndpointUtilities.chatCompletionsURL(baseURL: endpoint)
     else {

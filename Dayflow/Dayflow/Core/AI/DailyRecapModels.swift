@@ -4,6 +4,7 @@ enum DailyRecapProvider: String, Codable, CaseIterable, Sendable {
   case dayflow
   case local
   case gemini
+  case openAICompatible = "openai_compatible"
   case chatgpt
   case claude
   case none
@@ -14,6 +15,7 @@ enum DailyRecapProvider: String, Codable, CaseIterable, Sendable {
     .claude,
     .chatgpt,
     .gemini,
+    .openAICompatible,
     .local,
     .none,
   ]
@@ -55,7 +57,7 @@ enum DailyRecapProvider: String, Codable, CaseIterable, Sendable {
     case .local:
       return .local
     case .openAICompatible:
-      return .none
+      return .openAICompatible
     }
   }
 
@@ -71,6 +73,8 @@ enum DailyRecapProvider: String, Codable, CaseIterable, Sendable {
       return String(localized: "Local")
     case .gemini:
       return String(localized: "Gemini")
+    case .openAICompatible:
+      return ProviderProfileStore.selectedProfile()?.name ?? String(localized: "Custom API")
     case .chatgpt:
       return String(localized: "ChatGPT")
     case .claude:
@@ -88,6 +92,8 @@ enum DailyRecapProvider: String, Codable, CaseIterable, Sendable {
       return String(localized: "Local")
     case .gemini:
       return GeminiModelPreference.default.primary.displayName
+    case .openAICompatible:
+      return ProviderProfileStore.selectedProfile()?.modelID ?? String(localized: "Custom API")
     case .chatgpt:
       return String(localized: "GPT-6 Astra")
     case .claude:
@@ -106,6 +112,8 @@ enum DailyRecapProvider: String, Codable, CaseIterable, Sendable {
         localized: "Uses Ollama, LM Studio, or another local-compatible server on this Mac.")
     case .gemini:
       return GeminiModelPreference.default.primary.displayName
+    case .openAICompatible:
+      return String(localized: "Uses your configured OpenAI-compatible provider profile.")
     case .chatgpt:
       return String(localized: "GPT-6 Astra")
     case .claude:
@@ -123,6 +131,8 @@ enum DailyRecapProvider: String, Codable, CaseIterable, Sendable {
       return "local_llm"
     case .gemini:
       return "gemini_direct"
+    case .openAICompatible:
+      return "openai_compatible"
     case .chatgpt, .claude:
       return "chat_cli"
     case .none:
@@ -138,6 +148,8 @@ enum DailyRecapProvider: String, Codable, CaseIterable, Sendable {
       return Self.currentLocalModelID()
     case .gemini:
       return GeminiModelPreference.default.primary.rawValue
+    case .openAICompatible:
+      return ProviderProfileStore.selectedProfile()?.modelID
     case .chatgpt:
       return "gpt-6-astra"
     case .claude:
@@ -213,6 +225,8 @@ struct DailyStandupGenerationMetadata: Codable, Equatable, Sendable {
     case .gemini:
       return modelOrTool.flatMap(GeminiModel.init(rawValue:))?.displayName
         ?? modelOrTool ?? String(localized: "Gemini")
+    case .openAICompatible:
+      return modelOrTool ?? String(localized: "Custom API")
     case .chatgpt:
       return modelOrTool == "gpt-5.6-sol"
         ? String(localized: "GPT-5.6 Sol") : String(localized: "GPT-6 Astra")

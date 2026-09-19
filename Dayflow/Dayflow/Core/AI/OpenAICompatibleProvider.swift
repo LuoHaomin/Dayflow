@@ -28,17 +28,24 @@ final class OpenAICompatibleProvider: ChatGPTTimelinePromptSupporting {
           ]),
         .init(role: "user", content: content),
       ],
-      max_tokens: 16000
+      max_tokens: LLMAdvancedPreferences.maxTokens
     )
     // Other compatible endpoints may not accept OpenRouter's reasoning object.
     if URL(string: configuration.endpoint)?.host?.lowercased() == "openrouter.ai" {
       request.reasoning = .init(effort: "low")
     }
     // MiniMax M3 thinks by default and burns max_tokens on <think> blocks;
-    // timeline calls only need the final JSON.
+    // timeline calls only need the final JSON. Profile thinkingMode overrides:
+    // "disabled"/"adaptive" force it for any model, "auto" keeps the heuristic.
     let host = URL(string: configuration.endpoint)?.host?.lowercased() ?? ""
-    if host.hasSuffix("minimax.cn") || host.hasSuffix("minimax.io") {
-      if configuration.modelID.uppercased().contains("M3") {
+    let isMiniMax = host.hasSuffix("minimax.cn") || host.hasSuffix("minimax.io")
+    switch configuration.thinkingMode {
+    case "disabled":
+      request.thinking = .init(type: "disabled")
+    case "adaptive":
+      request.thinking = .init(type: "adaptive")
+    default:
+      if isMiniMax && configuration.modelID.uppercased().contains("M3") {
         request.thinking = .init(type: "disabled")
       }
     }
@@ -176,7 +183,7 @@ final class OpenAICompatibleProvider: ChatGPTTimelinePromptSupporting {
     var result = cards
     var i = 0
     while i < result.count - 1 {
-      guard cardDurationMinutes(result[i]) < 10 else { i += 1; continue }
+      guard cardDurationMinutes(result[i]) < LLMAdvancedPreferences.minCardMinutes else { i += 1; continue }
       let short = result.remove(at: i)
       let next = result[i]
       result[i] = ActivityCardData(
@@ -274,7 +281,7 @@ final class OpenAICompatibleProvider: ChatGPTTimelinePromptSupporting {
     }
   }
 
-  func generateText(prompt: String) async throws -> (text: String, log: LLMCall) {
-    try await transport.generateText(prompt: prompt)
+  func generateText(prompt: String, maxTokens: Int = 4000) async throws -> (text: String, log: LLMCall) {
+    try await transport.generateText(prompt: prompt, maxTokens: maxTokens)
   }
 }

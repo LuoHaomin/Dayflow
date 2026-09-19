@@ -11,7 +11,92 @@ struct SettingsOtherTabView: View {
     VStack(alignment: .leading, spacing: SettingsStyle.sectionSpacing) {
       appPreferencesSection
       outputLanguageSection
+      llmAdvancedSection
     }
+  }
+
+  // MARK: - Advanced LLM tuning (personal build)
+
+  @State private var timeoutText: String = ""
+  @State private var maxTokensText: String = ""
+  @State private var minCardMinutesText: String = ""
+  @State private var cliTimeoutText: String = ""
+
+  private var llmAdvancedSection: some View {
+    SettingsSection(
+      title: String(localized: "Advanced LLM tuning"),
+      subtitle: String(
+        localized:
+          "Timeouts are idle-intervals between network packets, not total request time. 0 restores defaults (600s / 16000 / 10min / 300s)."
+      )
+    ) {
+      VStack(alignment: .leading, spacing: 10) {
+        HStack {
+          Text("Request timeout (seconds)")
+            .font(.custom("Figtree", size: 13))
+          Spacer()
+          TextField("600", text: $timeoutText)
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 100)
+            .onSubmit { saveAdvanced() }
+        }
+        HStack {
+          Text("Max tokens (card generation)")
+            .font(.custom("Figtree", size: 13))
+          Spacer()
+          TextField("16000", text: $maxTokensText)
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 100)
+            .onSubmit { saveAdvanced() }
+        }
+        HStack {
+          Text("Minimum card length (minutes)")
+            .font(.custom("Figtree", size: 13))
+          Spacer()
+          TextField("10", text: $minCardMinutesText)
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 100)
+            .onSubmit { saveAdvanced() }
+        }
+        HStack {
+          Text("Agent CLI timeout (seconds)")
+            .font(.custom("Figtree", size: 13))
+          Spacer()
+          TextField("300", text: $cliTimeoutText)
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 100)
+            .onSubmit { saveAdvanced() }
+        }
+        SettingsSecondaryButton(title: String(localized: "Apply")) { saveAdvanced() }
+      }
+    }
+    .onAppear {
+      let d = UserDefaults.standard
+      timeoutText = d.object(forKey: LLMAdvancedPreferences.requestTimeoutKey) == nil
+        ? "" : String(Int(LLMAdvancedPreferences.requestTimeout))
+      maxTokensText = d.object(forKey: LLMAdvancedPreferences.maxTokensKey) == nil
+        ? "" : String(LLMAdvancedPreferences.maxTokens)
+      minCardMinutesText = d.object(forKey: LLMAdvancedPreferences.minCardMinutesKey) == nil
+        ? "" : String(LLMAdvancedPreferences.minCardMinutes)
+      cliTimeoutText = d.object(forKey: LLMAdvancedPreferences.cliTimeoutKey) == nil
+        ? "" : String(Int(LLMAdvancedPreferences.cliTimeout))
+    }
+  }
+
+  private func saveAdvanced() {
+    let d = UserDefaults.standard
+    func setDouble(_ text: String, _ key: String) {
+      let trimmed = text.trimmingCharacters(in: .whitespaces)
+      guard let value = Double(trimmed), value > 0 else {
+        d.removeObject(forKey: key)
+        return
+      }
+      d.set(value, forKey: key)
+    }
+    setDouble(timeoutText, LLMAdvancedPreferences.requestTimeoutKey)
+    setDouble(maxTokensText, LLMAdvancedPreferences.maxTokensKey)
+    setDouble(minCardMinutesText, LLMAdvancedPreferences.minCardMinutesKey)
+    setDouble(cliTimeoutText, LLMAdvancedPreferences.cliTimeoutKey)
   }
 
   // MARK: - App preferences

@@ -115,7 +115,8 @@ struct ClaudeCLIExecutionProfile: Sendable {
 struct ChatCLIProcessRunner {
   enum Constants {
     static let readChunkSize = 64 * 1024
-    static let timeoutSeconds: TimeInterval = 300
+       // Personal build: user-tunable via LLMAdvancedPreferences.cliTimeout.
+    static var timeoutSeconds: TimeInterval { LLMAdvancedPreferences.cliTimeout }
     static let codexFallbackDirectoryPrefix = "Dayflow-codex-home-"
   }
 

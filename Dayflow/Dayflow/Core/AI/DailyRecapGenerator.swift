@@ -22,6 +22,7 @@ enum DailyRecapGeneratorError: LocalizedError {
   case missingDayflowAuthToken
   case missingLocalConfiguration
   case missingGeminiAPIKey
+  case missingCustomProvider
   case missingCodexCLI
   case missingClaudeCLI
   case emptyGeneratedContent(day: String)
@@ -48,6 +49,8 @@ enum DailyRecapGeneratorError: LocalizedError {
         )
     case .missingGeminiAPIKey:
       return String(localized: "Gemini API key is missing.")
+    case .missingCustomProvider:
+      return String(localized: "Custom API provider is not configured. Add one in Settings → Providers.")
     case .missingCodexCLI:
       return String(localized: "Codex CLI is not installed.")
     case .missingClaudeCLI:
@@ -182,6 +185,11 @@ final class DailyRecapGenerator {
           ? "Add a Gemini API key before using this provider"
           : DailyRecapProvider.gemini.pickerSubtitle
       ),
+      .openAICompatible: DailyRecapProviderAvailability(
+        isAvailable: ProviderProfileStore.selectedProfile() != nil,
+        detail: ProviderProfileStore.selectedProfile()?.modelID
+          ?? "Add a provider profile in Settings → Providers"
+      ),
       .chatgpt: DailyRecapProviderAvailability(
         isAvailable: codexInstalled,
         detail: codexInstalled
@@ -219,6 +227,8 @@ final class DailyRecapGenerator {
       return try await generateWithLocal(context: context, metadata: metadata)
     case .gemini:
       return try await generateWithGemini(context: context, metadata: metadata)
+    case .openAICompatible:
+      return try await generateWithOpenAICompatible(context: context, metadata: metadata)
     case .chatgpt:
       return try await generateWithChatGPT(context: context, metadata: metadata)
     case .claude:
@@ -394,6 +404,28 @@ final class DailyRecapGenerator {
       throw DailyRecapGeneratorError.missingLocalConfiguration
     }
 
+    let prompt = Self.makeLocalPrompt(day: context.sourceDayString, cards: context.cards)
+    let (rawText, _) = try await provider.generateText(
+      prompt: prompt,
+      maxTokens: Self.localRecapMaxOutputTokens
+    )
+    let parsed = try Self.parseLocalResponse(rawText)
+    return try makeDraft(from: parsed, context: context, metadata: metadata)
+  }
+
+  private func generateWithOpenAICompatible(
+    context: DailyRecapGenerationContext,
+    metadata: DailyStandupGenerationMetadata
+  ) async throws -> DailyStandupDraft {
+    guard let profile = ProviderProfileStore.selectedProfile() else {
+      throw DailyRecapGeneratorError.missingCustomProvider
+    }
+    let provider = OpenAICompatibleProvider(
+      configuration: OpenAICompatibleRuntimeConfiguration(
+        configuration: profile.configuration,
+        bearerToken: ProviderProfileStore.apiKey(for: profile),
+        analyticsProvider: ProviderProfileStore.keychainID(for: profile.id),
+        thinkingMode: profile.thinkingMode))
     let prompt = Self.makeLocalPrompt(day: context.sourceDayString, cards: context.cards)
     let (rawText, _) = try await provider.generateText(
       prompt: prompt,

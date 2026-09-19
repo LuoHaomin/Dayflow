@@ -395,7 +395,7 @@ extension GeminiDirectProvider {
     var request = URLRequest(url: URL(string: urlWithKey)!)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    request.timeoutInterval = 600
+    request.timeoutInterval = LLMAdvancedPreferences.requestTimeout
     let requestStart = Date()
 
     do {
@@ -905,7 +905,7 @@ extension GeminiDirectProvider {
       }
 
       // Check if card is too short (except for last card)
-      if durationMinutes < 10 && index < cards.count - 1 {
+      if durationMinutes < LLMAdvancedPreferences.minCardMinutes && index < cards.count - 1 {
         return (
           false,
           "Card \(index + 1) '\(card.title)' is only \(String(format: "%.1f", durationMinutes)) minutes long"

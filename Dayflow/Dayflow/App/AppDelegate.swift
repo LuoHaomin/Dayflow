@@ -8,6 +8,12 @@ import Combine
 import ScreenCaptureKit
 import ServiceManagement
 
+/// Personal-build switches. Flip to false to restore upstream behavior.
+enum PersonalBuildConfig {
+  /// Disables Sentry crash reporting and PostHog analytics entirely.
+  static let disableTelemetry = true
+}
+
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
   enum PendingNotificationNavigationDestination: Equatable {
@@ -49,13 +55,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     applySavedDockIconPreference()
 
     // Configure crash reporting (Sentry) from shared telemetry preference.
-    SentryHelper.setEnabled(AnalyticsService.shared.isOptedIn)
+    if PersonalBuildConfig.disableTelemetry {
+      SentryHelper.isEnabled = false
+    } else {
+      SentryHelper.setEnabled(AnalyticsService.shared.isOptedIn)
+    }
 
     // Configure analytics (prod only; default opt-in ON)
     let info = Bundle.main.infoDictionary
     let POSTHOG_API_KEY = info?["PHPostHogApiKey"] as? String ?? ""
     let POSTHOG_HOST = info?["PHPostHogHost"] as? String ?? "https://us.i.posthog.com"
-    if !POSTHOG_API_KEY.isEmpty {
+    if !PersonalBuildConfig.disableTelemetry, !POSTHOG_API_KEY.isEmpty {
       AnalyticsService.shared.start(apiKey: POSTHOG_API_KEY, host: POSTHOG_HOST)
       analyticsConfigured = true
       AgentUsageTelemetryQueue.drain()

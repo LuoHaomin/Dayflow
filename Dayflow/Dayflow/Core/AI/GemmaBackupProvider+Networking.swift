@@ -16,7 +16,7 @@ extension GemmaBackupProvider {
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    request.timeoutInterval = 120
+    request.timeoutInterval = LLMAdvancedPreferences.requestTimeout
 
     let requestBody: [String: Any] = [
       "contents": [["parts": parts]],
